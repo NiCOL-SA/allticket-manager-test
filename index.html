@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f5f5f7">
+<title>券管理クラウド版 v3</title>
+<style>
+:root{--bg:#f5f5f7;--card:#fff;--text:#1d1d1f;--muted:#6e6e73;--line:#e5e5ea;--blue:#007aff;--red:#ff3b30}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);padding-bottom:40px}
+header{padding:16px;background:rgba(255,255,255,.96);backdrop-filter:blur(14px);position:sticky;top:0;z-index:10;border-bottom:1px solid #ddd}
+main{max-width:1050px;margin:auto;padding:14px}
+.card{background:#fff;border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,.05)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+button{border:0;border-radius:12px;padding:12px 14px;background:var(--blue);color:#fff;font-weight:700;font-size:14px}
+button.secondary{background:#eef1f5;color:#222}
+.hidden{display:none!important}
+.grid{display:grid;grid-template-columns:1fr;gap:10px}
+.loc{border:1px solid var(--line);border-radius:14px;padding:12px}
+.locname{font-weight:800;margin-bottom:8px}
+.daynight{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ticket{border:1px solid var(--line);border-radius:12px;padding:10px;background:#fff;text-align:left;width:100%;color:var(--text);font-weight:400}
+.ticket:active{transform:scale(.985);background:#f1f6ff}
+.label{font-size:12px;color:var(--muted)}
+.count{font-size:27px;font-weight:800;margin-top:2px}
+.zero{color:var(--red)}
+.small{font-size:12px;color:var(--muted)}
+.notice{background:#fff8e8;border-radius:12px;padding:10px;font-size:12px;color:#745100;margin-bottom:12px}
+.tablewrap{overflow:auto}
+table{border-collapse:collapse;width:100%;min-width:980px}
+th,td{padding:8px;border-bottom:1px solid var(--line);text-align:center;font-size:12px}
+th:first-child,td:first-child{text-align:left;font-weight:700;position:sticky;left:0;background:#fff}
+.tabs{display:flex;gap:6px;overflow:auto;margin-bottom:12px}
+.tabs button{background:#eef1f5;color:#222;white-space:nowrap}
+.tabs button.active{background:var(--blue);color:#fff}
+
+/* 確認ダイアログ */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.38);display:flex;align-items:center;justify-content:center;padding:18px;z-index:100}
+.dialog{width:min(420px,100%);background:#fff;border-radius:18px;padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.2)}
+.dialog h2{margin:4px 0 8px;font-size:20px}
+.dialog-date{font-size:13px;color:var(--muted);margin-bottom:8px}
+.dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+
+@media(min-width:720px){.grid{grid-template-columns:repeat(2,1fr)}}
+@media(min-width:980px){.grid{grid-template-columns:repeat(3,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <b style="font-size:22px">券管理クラウド版 v3</b>
+  <div class="small" id="headerSub"></div>
+</header>
+
+<main>
+<section id="gate" class="card">
+  <div class="notice">
+    月曜確認用デモ。社員メールログインなし想定。券の「昼/夜」表示を直接タップすると1枚使用の確認画面が出ます。
+  </div>
+  <b>デモ表示</b>
+  <div class="actions">
+    <button onclick="start('admin')">事務所 管理者</button>
+    <button class="secondary" onclick="start('tanaka-ipad')">田中・会社iPad</button>
+    <button class="secondary" onclick="start('tanaka-phone')">田中・個人スマホ</button>
+    <button class="secondary" onclick="start('mall-a')">商業施設・スマホA</button>
+    <button class="secondary" onclick="start('mall-b')">商業施設・スマホB</button>
+  </div>
+</section>
+
+<section id="app" class="hidden">
+  <div class="card">
+    <div class="small">この端末</div>
+    <div id="who" style="font-size:20px;font-weight:800"></div>
+    <div id="device" class="small"></div>
+    <div class="small" id="periodText" style="margin-top:8px"></div>
+  </div>
+
+  <section id="employee" class="hidden">
+    <div class="card">
+      <div class="small">現在の券</div>
+      <div id="inventory" class="grid"></div>
+      <div class="actions">
+        <button onclick="useTicket()">券を使用</button>
+      </div>
+    </div>
+    <div class="card">
+      <b>使用履歴</b>
+      <div id="history"></div>
+    </div>
+  </section>
+
+  <section id="admin" class="hidden">
+    <div class="card">
+      <div class="tabs">
+        <button id="t-overview" class="active" onclick="showTab('overview')">全員一覧</button>
+        <button id="t-distribute" onclick="showTab('distribute')">一括配券</button>
+        <button id="t-adjust" onclick="showTab('adjust')">追加・差替</button>
+        <button id="t-devices" onclick="showTab('devices')">端末</button>
+      </div>
+
+      <div id="overview">
+        <div class="tablewrap"><table id="overviewTable"></table></div>
+      </div>
+
+      <div id="distribute" class="hidden">
+        <div class="notice">各地区の「昼・夜」を横並びで入力します。</div>
+        <div class="tablewrap"><table id="distributionTable"></table></div>
+        <div class="actions"><button onclick="commitDistribution()">一括配券を確定</button></div>
+      </div>
+
+      <div id="adjust" class="hidden">
+        <div class="notice">本番では対象・券種・昼夜・枚数を選んで追加配券/差し替えを登録します。</div>
+      </div>
+
+      <div id="devices" class="hidden">
+        <div id="deviceList"></div>
+      </div>
+    </div>
+  </section>
+</section>
+</main>
+
+<div id="confirmModal" class="modal hidden" onclick="modalBackdrop(event)">
+  <div class="dialog">
+    <div id="confirmDate" class="dialog-date"></div>
+    <h2 id="confirmTitle"></h2>
+    <div class="small">1枚使用します。</div>
+    <div class="dialog-actions">
+      <button class="secondary" onclick="closeConfirm()">キャンセル</button>
+      <button onclick="confirmQuickUse()">OK</button>
+    </div>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
