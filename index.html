@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>券管理</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--blue:#0047cc;--orange:#e76600;--red:#d40000;--line:#dfe3ea;--bg:#f4f6f9;--text:#111}*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;background:var(--bg);color:var(--text)}button,input,select{font:inherit}.top{background:var(--blue);color:#fff;padding:14px 18px;position:sticky;top:0;z-index:4}.top h1{font-size:23px;margin:0}.top small{display:block;margin-top:5px}.wrap{max-width:760px;margin:auto;padding:14px}.panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:17px}.register{max-width:560px;margin:24px auto}.register h2{margin:0 0 8px}.field{margin:16px 0}.field label{display:block;font-weight:800;margin-bottom:7px}.control{width:100%;padding:13px;border:1px solid #cfd5df;border-radius:9px;background:#fff;font-size:17px}.code{font-size:24px;letter-spacing:6px;text-align:center;font-weight:800}.primary{border:0;border-radius:9px;background:var(--blue);color:#fff;padding:14px;font-weight:800;width:100%}.secondary{border:1px solid #bcc5d3;border-radius:9px;background:#fff;padding:12px;font-weight:750;width:100%}.hint{font-size:14px;color:#666;line-height:1.6}.deviceBar{background:#fff;border-bottom:1px solid var(--line);padding:9px 14px;text-align:center;font-size:14px;color:#555}.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}.district{font-size:19px;font-weight:800;padding:10px 12px 6px}.pair{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}.stock{background:#fff;border:0;padding:9px 6px 12px;min-height:86px;cursor:pointer}.stock+.stock{border-left:1px solid var(--line)}.label{font-size:23px;font-weight:850}.night .label{color:var(--blue)}.day .label{color:var(--orange)}.num{font-size:35px;font-weight:850;color:#111;line-height:1.15}.num.zero{color:var(--red)}.unit{font-size:17px;color:#111;margin-left:3px}.actions{display:grid;gap:9px;margin-top:14px}.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;z-index:10}.modal.on{display:flex}.sheet{background:#fff;width:min(720px,calc(100% - 24px));max-height:92vh;overflow:auto;border-radius:20px;padding:20px}.quickSheet{width:min(480px,calc(100% - 28px))}.sheethead{display:flex;justify-content:space-between;align-items:center}.x{border:0;background:transparent;font-size:28px}.ticketgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}.choice,.qty{border:1px solid #cfd5df;background:#fff;border-radius:7px;padding:11px;font-weight:750}.choice.on,.qty.on{background:var(--blue);color:#fff;border-color:var(--blue)}.choice .n{color:var(--blue)}.choice .d{color:var(--orange)}.choice.on span{color:#fff}.qtygrid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.modalactions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:20px}.quickQuestion{font-size:21px;font-weight:850;margin:18px 0 8px}.quickDate{color:#555;font-size:15px;margin-top:8px}.quickOne{font-size:17px;margin:6px 0 18px}.historyList{display:grid;gap:8px}.historyItem{border:1px solid var(--line);border-radius:10px;padding:10px}.historyItem b{display:block;margin-bottom:3px}.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 15px;border-radius:8px;display:none;z-index:20;max-width:90%;text-align:center}.hidden{display:none!important}.loading{opacity:.55;pointer-events:none}
+</style>
+</head>
+<body>
+<header class="top"><h1 id="title">券管理</h1><small id="period">端末確認中...</small></header>
+<div id="deviceBar" class="deviceBar hidden"></div>
+
+<section id="registerScreen" class="wrap register hidden">
+  <div class="panel">
+    <h2>初回端末登録</h2>
+    <p class="hint">この操作は最初の1回だけです。登録後は、この端末では登録した利用者の券画面だけが開きます。</p>
+    <div class="field"><label>利用者</label><select id="regWho" class="control"></select></div>
+    <div class="field"><label>端末名</label><select id="regDevice" class="control"></select></div>
+    <div class="field"><label>6桁の登録コード</label><input id="regCode" class="control code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>
+    <button id="registerBtn" class="primary">この端末を登録</button>
+  </div>
+</section>
+
+<section id="appScreen" class="wrap hidden">
+  <div class="cards" id="cards"></div>
+  <div class="actions">
+    <button class="primary" id="useBtn">▣ 券を使用</button>
+    <button class="secondary" id="historyBtn">▣ 使用履歴を確認</button>
+    <button class="secondary" id="refreshBtn">↻ 最新に更新</button>
+  </div>
+</section>
+
+<div class="modal" id="useModal"><div class="sheet"><div class="sheethead"><div><h2 style="margin:0">券を使用</h2><small>使用すると現在の期間の在庫から減ります。</small></div><button class="x" id="useClose">×</button></div><div class="field"><label>日付</label><input id="date" type="date" class="control"></div><div class="field"><label>券種類</label><div class="ticketgrid" id="ticketChoices"></div></div><div class="field"><label>使用枚数（最大5枚）</label><div class="qtygrid" id="qtyChoices"></div></div><p>現在の在庫： <b id="currentStock">—</b></p><div class="modalactions"><button class="secondary" id="useCancel">キャンセル</button><button class="primary" id="useCommit">使用する</button></div></div></div>
+<div class="modal" id="quickModal"><div class="sheet quickSheet"><div class="sheethead"><h2 style="margin:0">クイック使用</h2><button class="x" id="quickClose">×</button></div><div class="quickDate" id="quickDate"></div><div class="quickQuestion" id="quickQuestion"></div><div class="quickOne">1枚使用します。</div><div class="modalactions"><button class="secondary" id="quickCancel">キャンセル</button><button class="primary" id="quickOk">OK</button></div></div></div>
+<div class="modal" id="historyModal"><div class="sheet"><div class="sheethead"><h2 id="historyTitle" style="margin:0">使用履歴</h2><button class="x" id="historyClose">×</button></div><div class="historyList" id="historyList"></div></div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+const SUPABASE_URL='https://ylljutljjvwoumajvqor.supabase.co';
+const SUPABASE_KEY='sb_publishable_oKPWwKiQozrT3_jIjceFWQ_U89I8l-a';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const TOKEN_KEY='ticket_device_token_v8';
+const districts=['舞洲','西淀','住之江','東淀','平野','八尾'];
+const deviceOptions={
+  '重森':['重森 会社iPad','重森 個人スマホ'],
+  '上元':['上元 会社iPad','上元 個人スマホ'],
+  '森下':['森下 会社iPad','森下 個人スマホ'],
+  '桜井':['桜井 会社iPad','桜井 個人スマホ'],
+  '田中':['田中 会社iPad','田中 個人スマホ'],
+  '藤野':['藤野 会社iPad','藤野 個人スマホ'],
+  '住吉':['住吉 会社iPad','住吉 個人スマホ'],
+  '住宅':['住宅 個人スマホ'],
+  '商業施設':['商業施設 スマホA','商業施設 スマホB','商業施設 スマホC'],
+  '阪神':['阪神 谷川','阪神 竹原','阪神 白鳥','阪神 岡崎','阪神 上田','阪神 久保']
+};
+let token=localStorage.getItem(TOKEN_KEY)||'';
+let profile=null;
+let stock={};
+let selectedTicket=null,selectedQty=1,quickTarget=null;
+function resetStock(){districts.forEach(d=>stock[d]=[0,0])}resetStock();
+function toast(t){const e=document.getElementById('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',3200)}
+function opId(){return (crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2))}
+async function withBusy(btn,label,fn){if(btn.disabled)return;const old=btn.textContent;btn.disabled=true;btn.textContent=label;try{return await fn()}finally{btn.disabled=false;btn.textContent=old}}
+function commError(e){console.error(e);toast('通信に失敗しました。最新の残数を確認してください。');}
+function jpNow(){return new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date())}
+function dateValue(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
+function periodText(){const j=new Date(new Date().toLocaleString('en-US',{timeZone:'Asia/Tokyo'}));const shifted=new Date(j.getTime()-9*3600000);const y=shifted.getFullYear(),m=shifted.getMonth()+1,d=shifted.getDate();if(d<16)return `${y}年${m}月前半（${m}/1 09:00〜${m}/16 08:59）`;const nm=m===12?1:m+1;return `${y}年${m}月後半（${m}/16 09:00〜${nm}/1 08:59）`}
+function showRegister(message=''){profile=null;document.getElementById('registerScreen').classList.remove('hidden');document.getElementById('appScreen').classList.add('hidden');document.getElementById('deviceBar').classList.add('hidden');document.getElementById('title').textContent='券管理';document.getElementById('period').textContent='初回端末登録';if(message)toast(message)}
+function showApp(){document.getElementById('registerScreen').classList.add('hidden');document.getElementById('appScreen').classList.remove('hidden');document.getElementById('deviceBar').classList.remove('hidden');document.getElementById('title').textContent=profile.display_name;document.getElementById('deviceBar').textContent='登録端末：'+profile.device_name;document.getElementById('period').textContent=`${jpNow()} ・ ${periodText()}`}
+document.getElementById('regWho').innerHTML=Object.keys(deviceOptions).map(x=>`<option value="${x}">${x}</option>`).join('');
+function setDeviceOptions(){const who=document.getElementById('regWho').value;document.getElementById('regDevice').innerHTML=deviceOptions[who].map(x=>`<option value="${x}">${x}</option>`).join('')}
+document.getElementById('regWho').onchange=setDeviceOptions;setDeviceOptions();
+async function restoreSession(){if(!token)return showRegister();try{const {data:r,error}=await sb.rpc('app_device_session',{p_device_token:token});if(error)throw error;if(!r?.length){localStorage.removeItem(TOKEN_KEY);token='';return showRegister('端末登録が無効になっています。再登録してください。')}profile=r[0];showApp();await refresh()}catch(e){console.error(e);showRegister('端末確認に失敗しました。') }}
+document.getElementById('registerBtn').onclick=async()=>{const who=document.getElementById('regWho').value,device=document.getElementById('regDevice').value,code=document.getElementById('regCode').value.trim();if(!/^\d{6}$/.test(code))return toast('6桁の登録コードを入力してください');document.body.classList.add('loading');try{const {data:r,error}=await sb.rpc('app_register_device',{p_display_name:who,p_device_name:device,p_registration_code:code});if(error)throw error;const row=r?.[0];if(!row?.success)throw new Error(row?.message||'登録できませんでした');token=row.device_token;localStorage.setItem(TOKEN_KEY,token);profile={display_name:row.display_name,device_name:row.device_name};showApp();await refresh();toast('端末登録が完了しました')}catch(e){toast(e.message)}finally{document.body.classList.remove('loading')}};
+async function refresh(){if(!token||!profile)return;document.body.classList.add('loading');try{const {data:r,error}=await sb.rpc('app_device_get_inventory',{p_device_token:token});if(error)throw error;resetStock();r.forEach(x=>stock[x.area][x.time_type==='night'?0:1]=Number(x.quantity));renderCards();document.getElementById('period').textContent=`${jpNow()} ・ ${periodText()}`;}catch(e){if(String(e.message).includes('端末登録が無効')){localStorage.removeItem(TOKEN_KEY);token='';showRegister('この端末は無効化されています。')}else toast('クラウド読込エラー: '+e.message)}finally{document.body.classList.remove('loading')}}
+function renderCards(){document.getElementById('cards').innerHTML=districts.map(d=>`<div class="card"><div class="district">${d}</div><div class="pair"><button class="stock night" data-d="${d}" data-i="0"><div class="label">夜</div><span class="num ${stock[d][0]===0?'zero':''}">${stock[d][0]}</span><span class="unit">枚</span></button><button class="stock day" data-d="${d}" data-i="1"><div class="label">昼</div><span class="num ${stock[d][1]===0?'zero':''}">${stock[d][1]}</span><span class="unit">枚</span></button></div></div>`).join('');document.querySelectorAll('.stock').forEach(b=>b.onclick=()=>openQuick(b.dataset.d,Number(b.dataset.i)))}
+function ticketButtons(){document.getElementById('ticketChoices').innerHTML=districts.flatMap(d=>[0,1].map(i=>`<button class="choice" data-d="${d}" data-i="${i}">${d}・<span class="${i===0?'n':'d'}">${i===0?'夜':'昼'}</span></button>`)).join('');document.querySelectorAll('#ticketChoices .choice').forEach(b=>b.onclick=()=>{document.querySelectorAll('#ticketChoices .choice').forEach(x=>x.classList.remove('on'));b.classList.add('on');selectedTicket={d:b.dataset.d,i:Number(b.dataset.i)};updateCurrentStock()})}
+function qtyButtons(){document.getElementById('qtyChoices').innerHTML=[1,2,3,4,5].map(q=>`<button class="qty ${q===1?'on':''}" data-q="${q}">${q}</button>`).join('');document.querySelectorAll('#qtyChoices .qty').forEach(b=>b.onclick=()=>{document.querySelectorAll('#qtyChoices .qty').forEach(x=>x.classList.remove('on'));b.classList.add('on');selectedQty=Number(b.dataset.q)})}
+function updateCurrentStock(){document.getElementById('currentStock').textContent=selectedTicket?stock[selectedTicket.d][selectedTicket.i]+'枚':'—'}
+document.getElementById('useBtn').onclick=()=>{selectedTicket=null;selectedQty=1;ticketButtons();qtyButtons();document.getElementById('date').value=dateValue();updateCurrentStock();document.getElementById('useModal').classList.add('on')};
+['useClose','useCancel'].forEach(id=>document.getElementById(id).onclick=()=>document.getElementById('useModal').classList.remove('on'));
+document.getElementById('useCommit').onclick=async()=>{if(!selectedTicket)return toast('券種類を選択してください');const btn=document.getElementById('useCommit'),rid=opId();await withBusy(btn,'処理中…',async()=>{try{const {data:r,error}=await sb.rpc('app_device_use_ticket_v84',{p_request_id:rid,p_device_token:token,p_area:selectedTicket.d,p_time_type:selectedTicket.i===0?'night':'day',p_quantity:selectedQty});if(error)throw error;const row=r?.[0];if(!row?.success)throw new Error(row?.message||'使用できませんでした');document.getElementById('useModal').classList.remove('on');await refresh();toast('使用を記録しました')}catch(e){commError(e);await refresh()}})};
+function openQuick(d,i){if(stock[d][i]<=0)return toast('在庫が0枚のため使用できません');quickTarget={d,i};document.getElementById('quickDate').textContent='現在日時：'+jpNow();document.getElementById('quickQuestion').textContent=`「${d}・${i===0?'夜':'昼'}を使用しますか？」`;document.getElementById('quickModal').classList.add('on')}
+['quickClose','quickCancel'].forEach(id=>document.getElementById(id).onclick=()=>document.getElementById('quickModal').classList.remove('on'));
+document.getElementById('quickOk').onclick=async()=>{if(!quickTarget)return;const btn=document.getElementById('quickOk'),rid=opId();await withBusy(btn,'処理中…',async()=>{try{const {data:r,error}=await sb.rpc('app_device_use_ticket_v84',{p_request_id:rid,p_device_token:token,p_area:quickTarget.d,p_time_type:quickTarget.i===0?'night':'day',p_quantity:1});if(error)throw error;const row=r?.[0];if(!row?.success)throw new Error(row?.message||'使用できませんでした');document.getElementById('quickModal').classList.remove('on');await refresh();toast('1枚使用しました')}catch(e){commError(e);await refresh()}})};
+document.getElementById('historyBtn').onclick=async()=>{document.getElementById('historyTitle').textContent=profile.display_name+'・使用履歴';document.getElementById('historyList').textContent='読み込み中...';document.getElementById('historyModal').classList.add('on');const {data:r,error}=await sb.rpc('app_device_get_usage_history',{p_device_token:token,p_limit:100});if(error){document.getElementById('historyList').textContent=error.message;return}document.getElementById('historyList').innerHTML=r.length?r.map(x=>`<div class="historyItem"><b>${new Date(x.occurred_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}</b>${x.area}・${x.time_type==='night'?'夜':'昼'}　${x.used_quantity}枚使用<br><span class="hint">操作端末：${x.device_name}</span></div>`).join(''):'使用履歴はありません。'};
+document.getElementById('historyClose').onclick=()=>document.getElementById('historyModal').classList.remove('on');
+document.getElementById('refreshBtn').onclick=refresh;
+restoreSession();
+</script>
+</body></html>
